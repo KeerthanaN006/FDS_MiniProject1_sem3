@@ -1,0 +1,103 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+st.set_page_config(page_title="GharConnect", page_icon="🏠", layout="wide")
+ 
+@st.cache_data
+def load_data():
+    df = pd.read_csv('house_price_mumbai.csv 
+    def convert_price(price_str):
+        if 'Cr' in price_str:
+            return float(price_str.replace(' Cr', '').replace(',', '')) * 1e7
+        elif 'L' in price_str:
+            return float(price_str.replace(' L', '').replace(',', '')) * 1e5
+        return float(price_str.replace(',', ''))
+ 
+    df['price'] = df['price'].apply(convert_price)
+    df['price_sqft'] = df['price_sqft'].str.replace(',', '').astype(float)
+ 
+    df['BHK'] = pd.to_numeric(df['BHK'].str.extract('(\d+)')[0], errors='coerce')
+ 
+    df.dropna(subset=['BHK'], inplace=True)
+
+    return df
+
+df = load_data()
+  
+st.image("logo.png", width=100)  # Load and display the logo image
+
+st.markdown("""
+    <div style="display: flex; align-items: center; justify-content: center; background-color: #1a1a1a; padding: 20px; border-radius: 10px;">
+        <div>
+            <h1 style="color: white; margin: 0;">GharConnect</h1>
+            <p style="color: #c4c4c4; margin: 0;">Apna Ghar Humara Vaada</p>
+        </div>
+    </div>
+""", unsafe_allow_html=True)
+ 
+st.sidebar.header("Filter Options")
+  
+locations = df['Location'].unique()
+selected_location = st.sidebar.selectbox('Select Location', locations)
+ 
+bhk_values = df['BHK'].unique()
+selected_bhk = st.sidebar.slider('Select BHK', int(min(bhk_values)), int(max(bhk_values)), (int(min(bhk_values)), int(max(bhk_values))))
+ 
+min_price = int(df['price'].min())
+max_price = min(int(df['price'].max()), 60000000)  
+selected_price_range = st.sidebar.slider('Select Budget (₹)', min_price, max_price, (min_price, max_price))
+ 
+filtered_data = df[(df['Location'] == selected_location) & 
+                   (df['BHK'] >= selected_bhk[0]) & 
+                   (df['BHK'] <= selected_bhk[1]) & 
+                   (df['price'] >= selected_price_range[0]) & 
+                   (df['price'] <= selected_price_range[1])]
+ 
+st.write(f"### Showing Data for {selected_location} with {selected_bhk[0]} to {selected_bhk[1]} BHK and Budget between ₹{selected_price_range[0]} - ₹{selected_price_range[1]}")
+st.dataframe(filtered_data[['Location', 'BHK', 'Total sqft', 'price', 'price_sqft']])
+ 
+st.subheader("Summary Statistics")
+st.write(f"**Total Properties**: {len(filtered_data)}")
+st.write(f"**Average Price (₹)**: {filtered_data['price'].mean():,.2f}")
+st.write(f"**Average Sqft**: {filtered_data['Total sqft'].mean():,.2f} sqft")
+ 
+st.header("Price Prediction") 
+bhk_input = st.number_input('Enter BHK', min_value=int(min(bhk_values)), max_value=int(max(bhk_values)), value=2)
+sqft_input = st.number_input('Enter Total Sqft', min_value=int(df['Total sqft'].min()), max_value=int(df['Total sqft'].max()), value=1000)
+ 
+X = df[['BHK', 'Total sqft']]
+y = df['price']
+ 
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+ 
+model = LinearRegression()
+model.fit(X_train, y_train)
+ 
+predicted_price = model.predict([[bhk_input, sqft_input]])
+st.write(f"### Predicted Price: ₹ {round(predicted_price[0], 2)}")
+ 
+predicted_price_per_sqft = predicted_price[0] / sqft_input
+st.write(f"### Predicted Price per Sqft: ₹ {round(predicted_price_per_sqft, 2)}")
+ 
+st.subheader("Price Distribution and Comparisons")
+ 
+plt.figure(figsize=(10, 6))
+sns.boxplot(x='BHK', y='price', data=df)
+plt.yscale('log')  # Logarithmic scale for better visualization
+plt.title('Price Distribution by BHK (Log Scale)')
+plt.xlabel('BHK')
+plt.ylabel('Price (Log Scale)')
+st.pyplot(plt)
+ 
+plt.figure(figsize=(10, 6))
+sns.scatterplot(x='Total sqft', y='price', hue='BHK', data=df, alpha=0.6)
+plt.title('Price vs Total Sqft')
+plt.xlabel('Total Sqft')
+plt.ylabel('Price')
+st.pyplot(plt)
+
