@@ -10,7 +10,7 @@ st.set_page_config(page_title="GharConnect", page_icon="🏠", layout="wide")
  
 @st.cache_data
 def load_data():
-    df = pd.read_csv('house_price_mumbai.csv 
+    df = pd.read_csv('house_price_mumbai.csv')
     def convert_price(price_str):
         if 'Cr' in price_str:
             return float(price_str.replace(' Cr', '').replace(',', '')) * 1e7
